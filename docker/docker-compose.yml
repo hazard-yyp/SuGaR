@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  sugar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sugar:base
+    container_name: sugar
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ..:/workspace
+      - /home/yyp/3D_GS/dataset:/workspace/dataset
+    working_dir: /workspace
+    stdin_open: true
+    tty: true

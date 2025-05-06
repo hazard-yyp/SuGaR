@@ -1,16 +1,17 @@
 version: "3.8"
 
 services:
-  sugar:
+  sugar_raw:
     build:
       context: .
       dockerfile: Dockerfile
     image: sugar:base
-    container_name: sugar
+    container_name: sugar_raw
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+      - EGL_PLATFORM=surfaceless
     volumes:
       - ..:/workspace
       - /home/yyp/3D_GS/dataset:/workspace/dataset

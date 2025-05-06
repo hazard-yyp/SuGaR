@@ -4,12 +4,15 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
 ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
+ENV EGL_PLATFORM=surfaceless
 
-# 基础工具 + zsh
+# 基础工具 + 显卡编译依赖 + OpenGL/EGL 支持 + zsh
 RUN apt update && apt install -y \
     wget curl git zsh build-essential \
-    htop vim tmux sudo locales \
-    libgl1 libglib2.0-0 unzip \
+    htop vim tmux sudo locales unzip \
+    ninja-build \
+    libgl1 libegl1 libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dev \
+    libglib2.0-0 \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 

@@ -1,12 +1,12 @@
 version: "3.8"
 
 services:
-  sugar_raw:
+  cosplat:
     build:
       context: .
       dockerfile: Dockerfile
     image: sugar:base
-    container_name: sugar_raw
+    container_name: cosplat
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all

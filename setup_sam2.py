@@ -4,20 +4,9 @@ import sys
 import requests
 
 # ======== Setup paths and config ========
-SAM2_REPO_URL = "https://github.com/facebookresearch/sam2"
-SAM2_LOCAL_DIR = os.path.join("semantic_module", "sam2")
 SAM2_CHECKPOINTS_DIR = os.path.join("semantic_module", "checkpoints")
 SAM2_CHECKPOINT_PATH = os.path.join(SAM2_CHECKPOINTS_DIR, "sam_vit_h_6b5553.pth")
 SAM2_CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/sam/sam_vit_h_6b5553.pth"
-
-# ======== Clone SAM2 repo if not exists ========
-if not os.path.exists(SAM2_LOCAL_DIR):
-    print(f"Cloning SAM2 repo into {SAM2_LOCAL_DIR}...")
-    os.makedirs("semantic_module", exist_ok=True)
-    subprocess.run(["git", "clone", SAM2_REPO_URL, SAM2_LOCAL_DIR], check=True)
-    print("✅ SAM2 repo cloned.")
-else:
-    print("✅ SAM2 repo already exists.")
 
 # ======== Install dependencies if missing ========
 def ensure_package(pkg_name):

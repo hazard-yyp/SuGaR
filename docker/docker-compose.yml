@@ -8,6 +8,7 @@ services:
     image: sugar:base
     container_name: cosplat
     runtime: nvidia
+    user: "${UID}:${GID}"
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics

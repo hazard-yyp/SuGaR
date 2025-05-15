@@ -57,6 +57,48 @@ class GaussianModel:
         self.percent_dense = 0
         self.spatial_lr_scale = 0
         self.setup_functions()
+        self.init_semantic_mask_cache()
+
+    def init_semantic_mask_cache(self):
+        self.semantic_masks = {}
+        self.semantic_root = None
+
+    def load_semantic_mask(self, image_name: str, mask_dir: str):
+        """
+        Load a semantic mask by image basename (no extension).
+        Will cache it internally.
+
+        Args:
+            image_name (str): Image filename without extension (e.g., "IMG_2331").
+            mask_dir (str): Root directory where masks are stored.
+        """
+        import os
+        import imageio.v2 as imageio
+
+        if self.semantic_root is None:
+            self.semantic_root = mask_dir
+
+        mask_path = os.path.join(mask_dir, f"{image_name}_mask.png")
+        if not os.path.exists(mask_path):
+            print(f"[WARNING] Mask not found: {mask_path}")
+            return None
+
+        mask = imageio.imread(mask_path)  # shape: H x W x 3
+        mask = torch.tensor(mask, dtype=torch.float32) / 255.0  # 留在 CPU
+        self.semantic_masks[image_name] = mask
+        return mask
+
+    def get_semantic_mask(self, image_name: str):
+        """
+        Retrieve cached semantic mask for given image.
+
+        Args:
+            image_name (str): basename without extension
+
+        Returns:
+            Tensor or None: [H, W, 3] float mask or None
+        """
+        return self.semantic_masks.get(image_name, None)
 
     def capture(self):
         return (

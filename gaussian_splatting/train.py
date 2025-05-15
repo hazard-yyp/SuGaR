@@ -29,6 +29,8 @@ try:
 except ImportError:
     TENSORBOARD_FOUND = False
 
+MASK_DIR = "./semantic_module/output/masks_png"  # Root directory for semantic masks
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -78,6 +80,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             viewpoint_stack = scene.getTrainCameras().copy()
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
+        # ======== Load Semantic Mask for current image ========
+        scene_name = os.path.basename(dataset.source_path.rstrip("/"))
+        mask_path = os.path.join(MASK_DIR, scene_name)
+        gaussians.load_semantic_mask(viewpoint_cam.image_name, mask_path)
         # Render
         if (iteration - 1) == debug_from:
             pipe.debug = True
@@ -87,6 +93,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         render_pkg = render(viewpoint_cam, gaussians, pipe, bg)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
+        # === Semantic mask supervision (optional) ===
+        semantic_mask = gaussians.get_semantic_mask(viewpoint_cam.image_name)
+        if semantic_mask is not None:
+            semantic_mask = semantic_mask.to("cuda")  # 显式加载到当前 GPU
+            # TODO: 替换为自定义的监督方式（如 mask 与渲染图的一致性损失）
+            # 示例伪代码：
+            # semantic_loss = F.l1_loss(image * semantic_mask, gt_image * semantic_mask)
+            # loss += 0.1 * semantic_loss
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)

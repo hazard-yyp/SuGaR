@@ -23,6 +23,8 @@ from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
 from scene.gaussian_model import BasicPointCloud
 
+from typing import Dict, Any 
+
 class CameraInfo(NamedTuple):
     uid: int
     R: np.array
@@ -34,6 +36,7 @@ class CameraInfo(NamedTuple):
     image_name: str
     width: int
     height: int
+    auxiliary: Dict[str, Any] = {}
 
 class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
@@ -98,8 +101,22 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         image_name = os.path.basename(image_path).split(".")[0]
         image = Image.open(image_path)
 
-        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                              image_path=image_path, image_name=image_name, width=width, height=height)
+        # 构建语义 mask 路径
+        scene_name = os.path.basename(os.path.dirname(images_folder.rstrip("/")))
+        semantic_mask_path = os.path.join(
+            "semantic_module", "output", "masks_png", scene_name, f"{image_name}_mask.png"
+        )
+
+        auxiliary = {
+            "semantic_mask_path": semantic_mask_path
+        }
+
+        cam_info = CameraInfo(
+            uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+            image_path=image_path, image_name=image_name,
+            width=width, height=height, auxiliary=auxiliary
+        )
+
         cam_infos.append(cam_info)
     sys.stdout.write('\n')
     return cam_infos

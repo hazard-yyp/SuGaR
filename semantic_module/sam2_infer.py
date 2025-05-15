@@ -21,8 +21,9 @@ from omegaconf import OmegaConf
 
 # ========== Config ==========
 IMAGE_DIR = "/workspace/dataset/gerrard-hall-test/images/"
-OUTPUT_MASK_DIR = "./semantic_module/output/masks_png/"
-OUTPUT_JSON_DIR = "./semantic_module/output/masks_json/"
+SCENE_NAME = os.path.basename(os.path.dirname(IMAGE_DIR.rstrip('/')))
+OUTPUT_MASK_DIR = f"./semantic_module/output/masks_png/{SCENE_NAME}/"
+OUTPUT_JSON_DIR = f"./semantic_module/output/masks_json/{SCENE_NAME}/"
 SAM_CHECKPOINT = "./semantic_module/checkpoints/sam2.1_hiera_large.pt"
 SAM_CONFIG = "sam2.1_hiera_l.yaml"
 SAM_CONFIG_DIR = "./semantic_module/sam2/sam2/configs/sam2.1"

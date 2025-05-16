@@ -12,6 +12,7 @@
 import os
 import numpy  # Added to avoid issue
 import torch
+import torch.nn.functional as F
 from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
@@ -93,18 +94,36 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         render_pkg = render(viewpoint_cam, gaussians, pipe, bg)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
-        # === Semantic mask supervision (optional) ===
-        semantic_mask = gaussians.get_semantic_mask(viewpoint_cam.image_name)
-        if semantic_mask is not None:
-            semantic_mask = semantic_mask.to("cuda")  # 显式加载到当前 GPU
-            # TODO: 替换为自定义的监督方式（如 mask 与渲染图的一致性损失）
-            # 示例伪代码：
-            # semantic_loss = F.l1_loss(image * semantic_mask, gt_image * semantic_mask)
-            # loss += 0.1 * semantic_loss
-        # Loss
+        # === Prepare GT image ===
         gt_image = viewpoint_cam.original_image.cuda()
+
+        # === Semantic mask supervision ===
+        semantic_mask = gaussians.get_semantic_mask(viewpoint_cam.image_name)
+        semantic_loss_weight = 0.05  # 可调超参数
+        semantic_loss = torch.tensor(0.0, device="cuda")  # 初始化防止未定义错误
+
+        if semantic_mask is not None:
+            # Step 1: 转为灰度 + [1, H, W]
+            semantic_mask = semantic_mask.mean(dim=2).unsqueeze(0)  # [1, H, W]
+
+            # Step 2: interpolate 到 image 尺寸 [1, H_img, W_img]
+            semantic_mask = F.interpolate(
+                semantic_mask[None],  # [1, 1, H, W]
+                size=image.shape[-2:],  # H_img, W_img
+                mode='bilinear',
+                align_corners=False
+            )[0].to(image.device)
+
+            # Step 3: Clamp
+            semantic_mask = semantic_mask.clamp(0, 1)
+
+            # Step 4: 计算语义一致性损失
+            semantic_loss = F.l1_loss(image * semantic_mask, gt_image * semantic_mask)
+
+        # === Main loss ===
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        loss += semantic_loss_weight * semantic_loss
         loss.backward()
 
         iter_end.record()

@@ -20,7 +20,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
 # ========== Config ==========
-IMAGE_DIR = "/workspace/dataset/gerrard-hall-test/images/"
+IMAGE_DIR = "/workspace/dataset/gerrard-hall-test2/images/"
 SCENE_NAME = os.path.basename(os.path.dirname(IMAGE_DIR.rstrip('/')))
 OUTPUT_MASK_DIR = f"./semantic_module/output/masks_png/{SCENE_NAME}/"
 OUTPUT_JSON_DIR = f"./semantic_module/output/masks_json/{SCENE_NAME}/"

@@ -166,7 +166,7 @@ if __name__ == "__main__":
         nerfmodel_30k = GaussianSplattingWrapper(
             source_path=source_path,
             output_path=gs_checkpoint_path,
-            iteration_to_load=30_000,
+            iteration_to_load=args.iteration_to_load,
             load_gt_images=True,
             eval_split=True,
             eval_split_interval=n_skip_images_for_eval_split,

@@ -82,9 +82,12 @@ for image_name in tqdm(all_images, desc="Generating SAM2 masks"):
     masks_list = []
     for i in range(masks.shape[0]):
         m = masks[i]
-        area = int(np.sum(m))
+        segmentation = m > 0.5  # 🚀 关键 → 应该先 threshold
+        area = int(np.sum(segmentation))
+        if area < 500:  # 🚀 关键 → 加 area filter → 保证 Hybrid Loss 效果不会被 tiny mask 拉低
+            continue
         masks_list.append({
-            "segmentation": m,
+            "segmentation": segmentation,
             "area": area
         })
 

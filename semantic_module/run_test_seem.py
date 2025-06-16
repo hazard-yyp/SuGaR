@@ -1,4 +1,4 @@
-# run_test_instance.py
+# run_test_seem.py
 
 import sys
 import os

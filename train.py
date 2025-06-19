@@ -1,4 +1,5 @@
 import argparse
+import os
 from sugar_utils.general_utils import str2bool
 from sugar_trainers.coarse_density import coarse_training_with_density_regularization
 from sugar_trainers.coarse_sdf import coarse_training_with_sdf_regularization
@@ -91,6 +92,13 @@ if __name__ == "__main__":
 
     # Parse arguments
     args = parser.parse_args()
+
+    # Derive semantic and instance mask paths from scene_path
+    scene_name = os.path.basename(os.path.normpath(args.scene_path))
+    mask_base_path = os.path.join("semantic_module", "output", "masks_png", scene_name)
+    args.semantic_mask_dir = os.path.join(mask_base_path, "semantic")
+    args.instance_mask_dir = os.path.join(mask_base_path, "instance")
+
     if args.low_poly:
         args.n_vertices_in_mesh = 200_000
         args.gaussians_per_triangle = 6
@@ -124,6 +132,8 @@ if __name__ == "__main__":
         'normal_factor': 0.2,
         'gpu': args.gpu,
         'white_background': args.white_background,
+        'semantic_mask_dir': args.semantic_mask_dir,
+        'instance_mask_dir': args.instance_mask_dir,
     })
     if args.regularization_type == 'sdf':
         coarse_sugar_path = coarse_training_with_sdf_regularization(coarse_args)
@@ -174,6 +184,8 @@ if __name__ == "__main__":
         'eval': args.eval,
         'gpu': args.gpu,
         'white_background': args.white_background,
+        'semantic_mask_dir': args.semantic_mask_dir,
+        'instance_mask_dir': args.instance_mask_dir,
     })
     refined_sugar_path = refined_training(refined_args)
     

@@ -57,48 +57,54 @@ class GaussianModel:
         self.percent_dense = 0
         self.spatial_lr_scale = 0
         self.setup_functions()
-        self.init_semantic_mask_cache()
+        self.init_mask_cache()
 
-    def init_semantic_mask_cache(self):
-        self.semantic_masks = {}
-        self.semantic_root = None
+    def init_mask_cache(self):
+        self.mask_cache = {
+            "semantic": {},
+            "instance": {}
+        }
+        self.mask_roots = {
+            "semantic": None,
+            "instance": None
+        }
 
-    def load_semantic_mask(self, image_name: str, mask_dir: str):
-        """
-        Load a semantic mask by image basename (no extension).
-        Will cache it internally.
-
-        Args:
-            image_name (str): Image filename without extension (e.g., "IMG_2331").
-            mask_dir (str): Root directory where masks are stored.
-        """
+    def load_mask(self, image_name: str, mask_dir: str, mask_type: str):
         import os
         import imageio.v2 as imageio
+        assert mask_type in {"semantic", "instance"}, f"Invalid mask type: {mask_type}"
 
-        if self.semantic_root is None:
-            self.semantic_root = mask_dir
+        if self.mask_roots[mask_type] is None:
+            self.mask_roots[mask_type] = mask_dir
 
-        mask_path = os.path.join(mask_dir, f"{image_name}_mask.png")
+        subdir = os.path.join(mask_dir, mask_type)
+        suffix = "_semantic.png" if mask_type == "semantic" else "_instance.png"
+        mask_path = os.path.join(subdir, f"{image_name}{suffix}")
+
         if not os.path.exists(mask_path):
-            print(f"[WARNING] Mask not found: {mask_path}")
+            print(f"[WARNING] {mask_type.capitalize()} mask not found: {mask_path}")
             return None
 
-        mask = imageio.imread(mask_path)  # shape: H x W x 3
-        mask = torch.tensor(mask, dtype=torch.float32) / 255.0  # 留在 CPU
-        self.semantic_masks[image_name] = mask
+        mask = imageio.imread(mask_path)
+        mask = torch.tensor(mask, dtype=torch.float32) / 255.0
+        self.mask_cache[mask_type][image_name] = mask
         return mask
 
+    def get_mask(self, image_name: str, mask_type: str):
+        assert mask_type in {"semantic", "instance"}, f"Invalid mask type: {mask_type}"
+        return self.mask_cache[mask_type].get(image_name, None)
+    
+    def load_semantic_mask(self, image_name: str, mask_dir: str):
+        return self.load_mask(image_name, mask_dir, mask_type="semantic")
+
+    def load_instance_mask(self, image_name: str, mask_dir: str):
+        return self.load_mask(image_name, mask_dir, mask_type="instance")
+
     def get_semantic_mask(self, image_name: str):
-        """
-        Retrieve cached semantic mask for given image.
+        return self.get_mask(image_name, mask_type="semantic")
 
-        Args:
-            image_name (str): basename without extension
-
-        Returns:
-            Tensor or None: [H, W, 3] float mask or None
-        """
-        return self.semantic_masks.get(image_name, None)
+    def get_instance_mask(self, image_name: str):
+        return self.get_mask(image_name, mask_type="instance")
 
     def capture(self):
         return (

@@ -8,7 +8,6 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
-
 import os
 import sys
 from PIL import Image
@@ -101,14 +100,15 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         image_name = os.path.basename(image_path).split(".")[0]
         image = Image.open(image_path)
 
-        # 构建语义 mask 路径
+        # 构建 mask 路径
         scene_name = os.path.basename(os.path.dirname(images_folder.rstrip("/")))
-        semantic_mask_path = os.path.join(
-            "semantic_module", "output", "masks_png", scene_name, f"{image_name}_mask.png"
-        )
+        base_mask_dir = os.path.join("semantic_module", "output", "masks_png", scene_name)
+        semantic_mask_path = os.path.join(base_mask_dir, f"{image_name}_semantic.png")
+        instance_mask_path = os.path.join(base_mask_dir, f"{image_name}_instance.png")
 
         auxiliary = {
-            "semantic_mask_path": semantic_mask_path
+            "semantic_mask_path": semantic_mask_path,
+            "instance_mask_path": instance_mask_path
         }
 
         cam_info = CameraInfo(

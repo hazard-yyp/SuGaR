@@ -32,6 +32,23 @@ except ImportError:
 
 MASK_DIR = "./semantic_module/output/masks_png"  # Root directory for semantic masks
 
+def compute_mask_loss(mask, image, gt_image):
+    if mask is None:
+        return torch.tensor(0.0, device=image.device)
+    
+    if mask.dim() == 2:
+        mask = mask.unsqueeze(0)  # [1, H, W]
+    elif mask.dim() == 3:
+        mask = mask.mean(dim=2, keepdim=True).permute(2, 0, 1)  # [1, H, W]
+
+    mask = F.interpolate(mask.unsqueeze(0), size=image.shape[-2:], mode='bilinear', align_corners=False)[0]
+
+    # Ensure mask is on the same device
+    mask = mask.to(image.device)
+    mask = mask.clamp(0, 1)
+
+    return F.l1_loss(image * mask, gt_image * mask)
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -72,20 +89,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         gaussians.update_learning_rate(iteration)
 
-        # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
             gaussians.oneupSHdegree()
 
-        # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
-        # ======== Load Semantic Mask for current image ========
         scene_name = os.path.basename(dataset.source_path.rstrip("/"))
         mask_path = os.path.join(MASK_DIR, scene_name)
         gaussians.load_semantic_mask(viewpoint_cam.image_name, mask_path)
-        # Render
+        gaussians.load_instance_mask(viewpoint_cam.image_name, mask_path)
+
         if (iteration - 1) == debug_from:
             pipe.debug = True
 
@@ -94,42 +109,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         render_pkg = render(viewpoint_cam, gaussians, pipe, bg)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
-        # === Prepare GT image ===
         gt_image = viewpoint_cam.original_image.cuda()
 
-        # === Semantic mask supervision ===
         semantic_mask = gaussians.get_semantic_mask(viewpoint_cam.image_name)
-        semantic_loss_weight = 0.05  # 可调超参数
-        semantic_loss = torch.tensor(0.0, device="cuda")  # 初始化防止未定义错误
+        instance_mask = gaussians.get_instance_mask(viewpoint_cam.image_name)
+        semantic_loss_weight = 0.05
+        instance_loss_weight = 0.05
+        
+        semantic_loss = compute_mask_loss(semantic_mask, image, gt_image)
+        instance_loss = compute_mask_loss(instance_mask, image, gt_image)
 
-        if semantic_mask is not None:
-            # Step 1: 转为灰度 + [1, H, W]
-            semantic_mask = semantic_mask.mean(dim=2).unsqueeze(0)  # [1, H, W]
-
-            # Step 2: interpolate 到 image 尺寸 [1, H_img, W_img]
-            semantic_mask = F.interpolate(
-                semantic_mask[None],  # [1, 1, H, W]
-                size=image.shape[-2:],  # H_img, W_img
-                mode='bilinear',
-                align_corners=False
-            )[0].to(image.device)
-
-            # Step 3: Clamp
-            semantic_mask = semantic_mask.clamp(0, 1)
-
-            # Step 4: 计算语义一致性损失
-            semantic_loss = F.l1_loss(image * semantic_mask, gt_image * semantic_mask)
-
-        # === Main loss ===
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss += semantic_loss_weight * semantic_loss
+        loss += instance_loss_weight * instance_loss
         loss.backward()
 
         iter_end.record()
 
         with torch.no_grad():
-            # Progress bar
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             if iteration % 10 == 0:
                 progress_bar.set_postfix({"Loss": f"{ema_loss_for_log:.{7}f}"})
@@ -137,22 +135,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if iteration == opt.iterations:
                 progress_bar.close()
 
-            # Log and save
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
 
-            # Densification
             if iteration < opt.densify_until_iter:
-                # Keep track of max radii in image-space for pruning
                 gaussians.max_radii2D[visibility_filter] = torch.max(gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
                 gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
-                
+
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
